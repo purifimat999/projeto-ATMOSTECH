@@ -605,6 +605,54 @@
             box-shadow: 0 0 0 3px rgba(199, 225, 232, 0.1);
         }
 
+        .board-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            color: var(--muted-strong);
+            font: inherit;
+            font-size: 0.62rem;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            cursor: default;
+            background: rgba(105, 126, 136, 0.16);
+            border: 1px solid rgba(196, 219, 224, 0.18);
+            border-radius: 8px;
+        }
+
+        .board-status::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #f19b8d;
+            box-shadow: 0 0 8px #f19b8d;
+        }
+
+        .board-status.is-on {
+            color: #9de3c3;
+            background: rgba(83, 174, 137, 0.14);
+            border-color: rgba(142, 224, 188, 0.28);
+        }
+
+        .board-status.is-on::before {
+            background: #8ee0bc;
+            box-shadow: 0 0 8px #8ee0bc;
+        }
+
+        .board-location {
+            max-width: 190px;
+            overflow: hidden;
+            color: var(--muted);
+            font-size: 0.58rem;
+            text-overflow: ellipsis;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .board-location:hover { color: var(--text); text-decoration: underline; }
+
         .main-layout { padding-top: 14px; }
 
         .metric-row {
@@ -836,6 +884,8 @@
                     <option value="Laboratório">Laboratório</option>
                     <option value="Estação externa">Estação externa</option>
                 </select>
+                <button class="board-status is-off" id="boardStatus" type="button" aria-label="Status da placa" aria-pressed="false"><span>Placa <strong id="boardStatusLabel">OFF</strong></span></button>
+                <a class="board-location" id="boardLocation" href="#" target="_blank" rel="noopener">GPS do dispositivo aguardando</a>
                 <span class="mini-badge"></span>
                 <span>ATMOSTECH</span>
             </div>

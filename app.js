@@ -6,8 +6,12 @@ if (window.ChartZoom) {
 }
 
 const firebaseConfig = {
-    apiKey: "AIzaSyCJbkfuryRyDq5eHCTQ0XLtGNuuuOyml-4",
-    projectId: "app-clima-3a002",
+    apiKey: "AIzaSyC8RUchuAsxVdsPsk9yEdZ8O8HaG05vKcE",
+    authDomain: "atmostech26.firebaseapp.com",
+    projectId: "atmostech26",
+    storageBucket: "atmostech26.firebasestorage.app",
+    messagingSenderId: "917510370604",
+    appId: "1:917510370604:web:934d5debee73d28863a889"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -35,6 +39,9 @@ const dailyAverageEl = document.getElementById("dailyAverage");
 const alertListEl = document.getElementById("alertList");
 const alertCountEl = document.getElementById("alertCount");
 const locationSelectorEl = document.getElementById("locationSelector");
+const boardStatusEl = document.getElementById("boardStatus");
+const boardStatusLabelEl = document.getElementById("boardStatusLabel");
+const boardLocationEl = document.getElementById("boardLocation");
 const alertsNavEl = document.getElementById("alertsNav");
 const dashboardNavEl = document.getElementById("dashboardNav");
 const reportsNavEl = document.getElementById("reportsNav");
@@ -48,6 +55,7 @@ const alertsPageCountEl = document.getElementById("alertsPageCount");
 let historicoGrafico = null;
 let techMessageHistory = [];
 let ultimaLeituraFisica = null;
+let ultimaLeituraTimestamp = 0;
 const techToggleEl = document.getElementById("techToggle");
 const techChatEl = document.getElementById("techChat");
 const techCloseEl = document.getElementById("techClose");
@@ -155,9 +163,39 @@ function formatoDataAtual(timestamp) {
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
-        timeZoneName: "short",
-        timeZone: "America/Fortaleza"
+        timeZoneName: "short"
     }).replace(".", "");
+}
+
+function atualizarStatusPlaca(timestamp = ultimaLeituraTimestamp) {
+    const online = timestamp > 0 && Date.now() - (timestamp * 1000) <= 180000;
+    boardStatusEl.classList.toggle("is-on", online);
+    boardStatusEl.classList.toggle("is-off", !online);
+    boardStatusEl.setAttribute("aria-pressed", String(online));
+    boardStatusEl.title = online ? "Placa online: última leitura recente" : "Placa offline: sem leitura recente";
+    boardStatusLabelEl.textContent = online ? "ON" : "OFF";
+}
+
+function iniciarLocalizacaoDispositivo() {
+    if (!navigator.geolocation) {
+        boardLocationEl.textContent = "GPS indisponível";
+        return;
+    }
+
+    navigator.geolocation.watchPosition(({ coords }) => {
+        const { latitude, longitude } = coords;
+        boardLocationEl.textContent = `Dispositivo ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        boardLocationEl.href = `https://www.google.com/maps?q=${latitude},${longitude}`;
+        boardLocationEl.title = "Abrir a localização atual do dispositivo no mapa";
+    }, () => {
+        boardLocationEl.textContent = "GPS bloqueado";
+        boardLocationEl.removeAttribute("href");
+        boardLocationEl.title = "Permita o acesso à localização para usar o GPS do dispositivo";
+    }, {
+        enableHighAccuracy: true,
+        maximumAge: 30000,
+        timeout: 15000
+    });
 }
 
 function calcularPontoOrvalho(temperatura, umidade) {
@@ -466,10 +504,16 @@ umidAtualEl.textContent = valorPadrao.umid.toFixed(0);
 tempDetalheEl.textContent = valorPadrao.temp.toFixed(1);
 umidDetalheEl.textContent = valorPadrao.umid.toFixed(0);
 dataAtualEl.textContent = "Aguardando leitura...";
+atualizarStatusPlaca(0);
+boardLocationEl.textContent = "GPS do dispositivo aguardando";
+iniciarLocalizacaoDispositivo();
 atualizarModulos(valorPadrao.temp, valorPadrao.umid, ["Agora"], [valorPadrao.temp], [valorPadrao.umid]);
+window.setInterval(() => atualizarStatusPlaca(), 15000);
 
 onSnapshot(q, (snapshot) => {
     if (!snapshot || snapshot.empty) {
+        ultimaLeituraTimestamp = 0;
+        atualizarStatusPlaca(0);
         tempAtualEl.textContent = valorPadrao.temp.toFixed(1);
         umidAtualEl.textContent = valorPadrao.umid.toFixed(0);
         tempDetalheEl.textContent = valorPadrao.temp.toFixed(1);
@@ -486,6 +530,8 @@ onSnapshot(q, (snapshot) => {
     const temperaturaAtual = extrairValor(dadosRecentes.temperatura);
     const umidadeAtual = extrairValor(dadosRecentes.umidade);
     const timestampAtual = extrairTimestamp(dadosRecentes.timestamp);
+    ultimaLeituraTimestamp = timestampAtual;
+    atualizarStatusPlaca(timestampAtual);
 
     tempAtualEl.textContent = temperaturaAtual.toFixed(1);
     umidAtualEl.textContent = umidadeAtual.toFixed(0);
