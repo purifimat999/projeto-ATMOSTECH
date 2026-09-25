@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ClimaTech Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-deep: #020d1a;
+            --bg-mid: #071d2b;
+            --panel: rgba(10, 28, 39, 0.72);
+            --panel-strong: rgba(11, 33, 45, 0.86);
+            --panel-soft: rgba(18, 47, 64, 0.78);
+            --line: rgba(164, 201, 232, 0.14);
+            --text: #edf7ff;
+            --muted: rgba(214, 234, 255, 0.68);
+            --muted-strong: rgba(220, 240, 255, 0.8);
+            --temp: #ff8d74;
+            --humid: #72d2ff;
+            --electric: #9ad7ff;
+            --nav: rgba(111, 177, 222, 0.18);
+            --shadow: 0 30px 60px rgba(0, 0, 0, 0.38);
+            --graph-grid: rgba(164, 201, 232, 0.14);
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            min-height: 100%;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text);
+            background:
+                linear-gradient(rgba(5, 17, 29, 0.78), rgba(5, 17, 29, 0.72)),
+                url("https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1600&q=80") center/cover no-repeat fixed;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 32px 20px;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(120deg, rgba(11, 34, 50, 0.65), rgba(2, 10, 18, 0.3));
+            pointer-events: none;
+        }
+
+        .dashboard-shell {
+            position: relative;
+            z-index: 1;
+            width: min(1180px, 100%);
+            min-height: 780px;
+            padding: 16px 20px 18px;
+            border-radius: 26px;
+            background: rgba(9, 20, 31, 0.56);
+            border: 1px solid rgba(177, 214, 240, 0.14);
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 4px 8px 18px;
+            border-bottom: 1px solid rgba(165, 195, 222, 0.08);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: rgba(227, 244, 255, 0.92);
+        }
+
+        .brand-mark {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, rgba(138, 214, 255, 0.22), rgba(157, 188, 255, 0.08));
+            box-shadow: inset 0 0 20px rgba(138, 214, 255, 0.3), 0 0 14px rgba(102, 178, 255, 0.18);
+            border: 1px solid rgba(155, 206, 255, 0.24);
+            font-size: 0.9rem;
+        }
+
+        .nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            border: 1px solid rgba(162, 194, 222, 0.12);
+            border-radius: 999px;
+            background: rgba(17, 42, 57, 0.3);
+        }
+
+        .nav-link {
+            appearance: none;
+            border: none;
+            background: transparent;
+            color: rgba(220, 239, 255, 0.8);
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: capitalize;
+            padding: 0.7rem 0.85rem;
+            border-radius: 999px;
+            cursor: default;
+            opacity: 0.9;
+        }
+
+        .nav-link.active {
+            background: rgba(168, 218, 255, 0.1);
+            box-shadow: inset 0 0 12px rgba(126, 190, 255, 0.12);
+            color: #f0fbff;
+        }
+
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: rgba(219, 235, 252, 0.92);
+            font-size: 0.76rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .topbar-right .mini-badge {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #7ed7ff, #b6d1ff);
+            box-shadow: 0 0 18px rgba(126, 215, 255, 0.8);
+        }
+
+        .main-layout {
+            padding-top: 22px;
+        }
+
+        .metric-row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        .metric-card {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 136px;
+            padding: 18px 18px 16px;
+            border-radius: 18px;
+            background: rgba(11, 28, 39, 0.88);
+            border: 1px solid rgba(143, 199, 234, 0.12);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+        }
+
+        .metric-card::before {
+            content: "";
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 4px;
+            border-radius: 18px 18px 0 0;
+            opacity: 0.95;
+        }
+
+        .metric-card.temp::before { background: linear-gradient(90deg, rgba(255, 178, 148, 0.8), rgba(255, 96, 93, 0.72)); }
+        .metric-card.humidity::before { background: linear-gradient(90deg, rgba(118, 213, 255, 0.88), rgba(65, 134, 241, 0.74)); }
+
+        .metric-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+            color: rgba(215, 236, 255, 0.82);
+            font-size: 0.72rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .metric-card.temp .metric-value,
+        .metric-card.humidity .metric-value {
+            align-items: flex-end;
+        }
+
+        .metric-head .signal {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            box-shadow: 0 0 20px currentColor;
+        }
+
+        .metric-card.temp .signal {
+            background: var(--temp);
+            color: var(--temp);
+        }
+
+        .metric-card.humidity .signal {
+            background: var(--humid);
+            color: var(--humid);
+        }
+
+        .metric-value {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            line-height: 1;
+            font-weight: 800;
+        }
+
+        .metric-value .number {
+            font-size: clamp(2.2rem, 4vw, 3.2rem);
+            letter-spacing: -0.06em;
+            line-height: 0.9;
+        }
+
+        .metric-card.temp .number { color: #ff9b8a; }
+        .metric-card.humidity .number { color: #81d4ff; }
+
+        .metric-value .suffix {
+            font-size: 1.2rem;
+            font-weight: 700;
+            opacity: 0.9;
+        }
+
+        .content-row {
+            display: grid;
+            grid-template-columns: minmax(0, 2.3fr) 180px;
+            gap: 20px;
+            align-items: stretch;
+        }
+
+        .chart-panel {
+            padding: 18px 18px 10px;
+            border-radius: 22px;
+            background: rgba(8, 30, 39, 0.7);
+            border: 1px solid rgba(153, 197, 225, 0.12);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+        }
+
+        .chart-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 10px;
+            padding: 2px 2px 0;
+        }
+
+        .chart-title {
+            margin: 0;
+            font-size: 1.02rem;
+            color: rgba(231, 244, 255, 0.95);
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .chart-header .date-label {
+            color: rgba(200, 223, 242, 0.78);
+            font-size: 0.75rem;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+
+        .chart-wrap {
+            position: relative;
+            height: 326px;
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
+            cursor: grab;
+            touch-action: none;
+        }
+
+        canvas:active {
+            cursor: grabbing;
+        }
+
+        .orb-panel {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 320px;
+            padding: 14px;
+            border-radius: 22px;
+            background: rgba(9, 31, 39, 0.8);
+            border: 1px solid rgba(149, 201, 231, 0.12);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .orb-panel::before {
+            content: "";
+            position: absolute;
+            inset: 16% auto auto 16%;
+            width: 60%;
+            height: 60%;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(160, 216, 255, 0.22), rgba(160, 216, 255, 0.04) 55%, transparent 75%);
+            filter: blur(10px);
+        }
+
+        .orb {
+            position: relative;
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.9), rgba(130, 190, 233, 0.56) 18%, rgba(39, 118, 156, 0.22) 48%, rgba(8, 25, 38, 0.9) 72%);
+            border: 1px solid rgba(196, 228, 255, 0.26);
+            box-shadow: inset 0 0 28px rgba(150, 219, 255, 0.35), 0 0 60px rgba(122, 170, 214, 0.22);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: rgba(226, 241, 255, 0.9);
+            font-size: 0.76rem;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            font-weight: 800;
+            text-shadow: 0 0 18px rgba(162, 216, 255, 0.7);
+        }
+
+        .orb::before,
+        .orb::after {
+            content: "";
+            position: absolute;
+            border-radius: 50%;
+        }
+
+        .orb::before {
+            inset: -20px;
+            border: 1px solid rgba(160, 214, 255, 0.22);
+            box-shadow: 0 0 16px rgba(121, 191, 244, 0.15);
+        }
+
+        .orb::after {
+            inset: 18px;
+            border: 1px solid rgba(172, 222, 255, 0.2);
+            box-shadow: inset 0 0 20px rgba(141, 208, 255, 0.16);
+        }
+
+        .detail-row {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .detail-card {
+            padding: 16px 18px 14px;
+            border-radius: 16px;
+            background: rgba(10, 27, 39, 0.8);
+            border: 1px solid rgba(153, 197, 225, 0.12);
+        }
+
+        .detail-label {
+            margin: 0 0 12px;
+            color: rgba(198, 222, 243, 0.72);
+            font-size: 0.68rem;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            font-weight: 800;
+        }
+
+        .detail-value {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+            font-weight: 800;
+            line-height: 1.1;
+            font-size: 0.95rem;
+        }
+
+        .detail-value strong {
+            font-size: 1.7rem;
+            letter-spacing: -0.05em;
+        }
+
+        .detail-card.temp strong { color: #ff9d86; }
+        .detail-card.humidity strong { color: #82d7ff; }
+
+        .detail-meta {
+            margin-top: 10px;
+            color: rgba(192, 220, 245, 0.7);
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        @media (max-width: 900px) {
+            .content-row {
+                grid-template-columns: 1fr;
+            }
+
+            .orb-panel {
+                min-height: 220px;
+            }
+        }
+
+        @media (max-width: 680px) {
+            body {
+                padding: 18px 12px;
+            }
+
+            .dashboard-shell {
+                padding: 14px 12px 16px;
+            }
+
+            .topbar {
+                flex-wrap: wrap;
+            }
+
+            .nav {
+                order: 3;
+                width: 100%;
+                justify-content: center;
+                overflow-x: auto;
+            }
+
+            .metric-row,
+            .detail-row {
+                grid-template-columns: 1fr;
+            }
+
+            .chart-wrap {
+                height: 260px;
+            }
+        }
+
+        /* Visual direction: compact atmospheric monitoring console. */
+        :root {
+            --bg-deep: #071b2e;
+            --bg-mid: #12364d;
+            --panel: rgba(19, 55, 76, 0.72);
+            --panel-strong: rgba(14, 43, 63, 0.9);
+            --line: rgba(194, 226, 239, 0.14);
+            --text: #f3f8fa;
+            --muted: rgba(213, 230, 237, 0.62);
+            --muted-strong: rgba(225, 239, 244, 0.82);
+            --temp: #ee9b88;
+            --humid: #8bc7dc;
+            --shadow: 0 24px 60px rgba(1, 15, 28, 0.48);
+        }
+
+        body {
+            padding: 12px 0;
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+            background:
+                linear-gradient(90deg, rgba(4, 19, 31, 0.72), rgba(8, 27, 43, 0.5)),
+                url("https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?auto=format&fit=crop&w=2200&q=85") center/cover no-repeat fixed;
+        }
+
+        body::before {
+            background: linear-gradient(130deg, rgba(19, 70, 95, 0.28), rgba(2, 14, 25, 0.58));
+        }
+
+        .dashboard-shell {
+            width: 100%;
+            max-width: none;
+            min-height: 0;
+            padding: 12px 16px 16px;
+            border-radius: 20px;
+            background: linear-gradient(145deg, rgba(10, 40, 60, 0.88), rgba(8, 26, 46, 0.86));
+            border: 1px solid rgba(185, 220, 235, 0.2);
+            box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,0.08);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+
+        .topbar {
+            padding: 2px 4px 11px;
+            border-bottom-color: rgba(180, 218, 232, 0.1);
+        }
+
+        .brand {
+            gap: 8px;
+            font-size: 0.8rem;
+            letter-spacing: 0.06em;
+        }
+
+        .brand-mark {
+            width: 25px;
+            height: 25px;
+            background: linear-gradient(135deg, #6ea9b6, #2e6075);
+            border-color: rgba(197, 239, 242, 0.35);
+            color: #d8f2f0;
+        }
+
+        .nav {
+            gap: 1px;
+            padding: 3px 5px;
+            background: rgba(109, 158, 176, 0.15);
+            border-color: rgba(186, 221, 231, 0.14);
+        }
+
+        .nav-link {
+            padding: 0.52rem 0.78rem;
+            font-size: 0.68rem;
+            color: rgba(220, 239, 244, 0.62);
+        }
+
+        .nav-link.active {
+            background: rgba(172, 215, 221, 0.25);
+            color: #f2fbfb;
+        }
+
+        .nav-link:not(.active) { cursor: pointer; }
+        .nav-link[data-mobile-only] { display: none; }
+
+        .location-selector {
+            appearance: none;
+            max-width: 142px;
+            padding: 7px 25px 7px 10px;
+            color: var(--muted-strong);
+            font: inherit;
+            font-size: 0.67rem;
+            background: rgba(6, 26, 42, 0.62) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='m2 3 3 3 3-3' fill='none' stroke='%23b8d5dd' stroke-width='1.2'/%3E%3C/svg%3E") right 9px center/10px no-repeat;
+            border: 1px solid rgba(180, 220, 230, 0.18);
+            border-radius: 8px;
+            outline: none;
+        }
+
+        .location-selector:focus { border-color: rgba(147, 213, 224, 0.65); }
+
+        .climate-modules { display: grid; gap: 10px; margin-top: 10px; }
+        .module-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+        .climate-card, .forecast-panel, .history-panel, .alerts-panel {
+            background: linear-gradient(145deg, rgba(19, 62, 81, 0.74), rgba(8, 34, 53, 0.82));
+            border: 1px solid rgba(174, 216, 228, 0.14);
+            border-radius: 14px;
+            box-shadow: inset 0 1px 0 rgba(236, 251, 253, 0.04);
+        }
+        .climate-card { min-height: 105px; padding: 13px; }
+        .module-label { margin: 0; color: var(--muted); font-size: 0.63rem; letter-spacing: 0.08em; text-transform: uppercase; }
+        .module-value { display: flex; align-items: baseline; gap: 4px; margin-top: 12px; color: var(--text); font-size: 1.48rem; font-weight: 800; }
+        .module-value small { color: var(--muted-strong); font-size: 0.72rem; font-weight: 700; }
+        .module-note { margin: 6px 0 0; color: var(--muted); font-size: 0.65rem; }
+        .status-card { position: relative; overflow: hidden; }
+        .status-card::after { content: ""; position: absolute; right: -18px; bottom: -26px; width: 80px; height: 80px; border: 1px solid rgba(131, 222, 194, 0.24); border-radius: 50%; }
+        .status-value { color: #9de3c3; font-size: 1.12rem; }
+        .status-dot { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: #8ee0bc; box-shadow: 0 0 12px #8ee0bc; }
+        .module-row { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(250px, 0.85fr); gap: 10px; }
+        .forecast-panel, .history-panel, .alerts-panel { padding: 14px; }
+        .module-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+        .module-title { margin: 0; color: var(--text); font-size: 0.82rem; }
+        .module-caption { color: var(--muted); font-size: 0.63rem; }
+        .forecast-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+        .forecast-day { padding: 9px 5px; text-align: center; background: rgba(3, 24, 40, 0.34); border: 1px solid rgba(171, 214, 226, 0.09); border-radius: 9px; }
+        .forecast-day strong { display: block; color: var(--muted-strong); font-size: 0.66rem; }
+        .forecast-icon { display: block; margin: 8px 0; color: #c4e7ec; font-size: 1rem; }
+        .forecast-temp { color: #f2ac98; font-size: 0.72rem; font-weight: 800; }
+        .forecast-humidity { display: block; margin-top: 4px; color: #91cee0; font-size: 0.62rem; }
+        .history-chart-wrap { height: 150px; }
+        .alerts-panel { scroll-margin-top: 14px; }
+        .alert-list { display: grid; gap: 7px; }
+        .alert-item { display: flex; align-items: center; gap: 9px; padding: 9px 10px; background: rgba(3, 24, 40, 0.3); border-radius: 8px; color: var(--muted-strong); font-size: 0.7rem; }
+        .alert-item::before { content: ""; width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: #8ee0bc; box-shadow: 0 0 10px #8ee0bc; }
+        .alert-item.warning::before { background: #f2c17e; box-shadow: 0 0 10px #f2c17e; }
+        .alert-item.critical::before { background: #f19b8d; box-shadow: 0 0 10px #f19b8d; }
+        .empty-alert { color: var(--muted); font-size: 0.7rem; }
+        .alerts-view { display: none; padding-top: 14px; }
+        .alerts-view.is-visible { display: block; }
+        .alerts-view-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
+        .alerts-view-title { margin: 0; color: var(--text); font-size: 1.15rem; }
+        .alerts-view-subtitle { margin: 5px 0 0; color: var(--muted); font-size: 0.72rem; }
+        .back-dashboard { padding: 8px 11px; color: var(--muted-strong); font: inherit; font-size: 0.7rem; cursor: pointer; background: rgba(114, 178, 190, 0.14); border: 1px solid rgba(179, 220, 229, 0.2); border-radius: 8px; }
+        .alerts-view-card { min-height: 250px; padding: 16px; background: linear-gradient(145deg, rgba(19, 62, 81, 0.78), rgba(8, 34, 53, 0.88)); border: 1px solid rgba(174, 216, 228, 0.16); border-radius: 15px; }
+        .alerts-view-card .alert-list { max-width: 720px; }
+
+        .topbar-right {
+            gap: 8px;
+            font-size: 0.68rem;
+            letter-spacing: 0.06em;
+        }
+
+        .topbar-right .mini-badge {
+            width: 28px;
+            height: 28px;
+            border: 2px solid rgba(215, 234, 239, 0.48);
+            background: radial-gradient(circle at 50% 35%, #e4edf0 0 22%, #829aa7 24% 43%, #415868 45% 100%);
+            box-shadow: 0 0 0 3px rgba(199, 225, 232, 0.1);
+        }
+
+        .main-layout { padding-top: 14px; }
+
+        .metric-row {
+            position: relative;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+            min-height: 148px;
+            padding: 16px;
+            overflow: hidden;
+            border: 1px solid rgba(191, 224, 233, 0.2);
+            border-radius: 17px;
+            background:
+                linear-gradient(90deg, rgba(5, 24, 39, 0.42), rgba(9, 35, 52, 0.16)),
+                url("https://images.unsplash.com/photo-1499346030926-9a72daac6c63?auto=format&fit=crop&w=2200&q=90") center 46%/cover no-repeat;
+            box-shadow: inset 0 1px 0 rgba(244, 252, 253, 0.08), 0 12px 26px rgba(1, 17, 29, 0.22);
+        }
+
+        .metric-row::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(115deg, rgba(8, 28, 44, 0.22), rgba(10, 50, 66, 0.02) 52%, rgba(5, 20, 33, 0.34));
+            pointer-events: none;
+        }
+
+        .metric-card {
+            z-index: 1;
+            min-height: 108px;
+            padding: 13px 15px 12px;
+            border-radius: 15px;
+            background: rgba(12, 40, 57, 0.42);
+            border-color: rgba(172, 220, 231, 0.14);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            text-align: center;
+        }
+
+        .metric-card::before { height: 2px; }
+        .metric-head { margin-bottom: 9px; font-size: 0.64rem; letter-spacing: 0.1em; justify-content: center; }
+        .metric-head .signal { width: 9px; height: 9px; }
+        .metric-value { justify-content: center; }
+        .metric-value .number { font-size: clamp(1.8rem, 3.5vw, 2.5rem); }
+        .metric-value .suffix { font-size: 0.9rem; }
+
+        .content-row { grid-template-columns: minmax(0, 1fr) minmax(280px, 0.38fr); }
+
+        .chart-panel {
+            padding: 13px 13px 7px;
+            border-radius: 15px;
+            background:
+                linear-gradient(180deg, rgba(19, 70, 91, 0.62), rgba(8, 34, 54, 0.82)),
+                radial-gradient(circle at 52% 38%, rgba(102, 176, 199, 0.12), transparent 58%);
+            border-color: rgba(176, 217, 229, 0.14);
+            box-shadow: inset 0 1px 0 rgba(235, 250, 252, 0.06), 0 12px 24px rgba(2, 20, 32, 0.2);
+        }
+
+        .chart-header { margin-bottom: 5px; padding: 1px 1px 0; }
+        .chart-title { font-size: 0.83rem; letter-spacing: 0; }
+        .chart-header .date-label { font-size: 0.62rem; }
+        .chart-wrap { height: 238px; margin-top: 5px; }
+
+        .detail-row { gap: 10px; margin-top: 10px; }
+        .detail-card {
+            padding: 12px 14px 11px;
+            border-radius: 14px;
+            background: rgba(15, 45, 63, 0.78);
+            border-color: rgba(174, 216, 228, 0.14);
+        }
+        .detail-label { margin-bottom: 6px; font-size: 0.62rem; letter-spacing: 0.12em; }
+        .detail-value strong { font-size: 1.35rem; }
+        .detail-meta { margin-top: 5px; font-size: 0.62rem; }
+
+        @media (max-width: 680px) {
+            body { padding: 10px; }
+            .dashboard-shell { padding: 10px; border-radius: 16px; }
+            .metric-row { min-height: 132px; padding: 9px; }
+            .topbar { gap: 10px; }
+            .brand { flex: 1; }
+            .topbar-right > span:last-child { display: none; }
+            .nav { order: 3; justify-content: flex-start; padding: 3px; }
+            .nav-link { padding-inline: 0.65rem; }
+            .topbar-right { flex-wrap: wrap; justify-content: flex-end; }
+            .location-selector { order: 2; max-width: 132px; }
+            .module-grid, .module-row { grid-template-columns: 1fr 1fr; }
+            .module-row { gap: 10px; }
+            .forecast-panel, .history-panel, .alerts-panel { grid-column: 1 / -1; }
+            .forecast-list { gap: 4px; }
+            .chart-wrap { height: 230px; }
+        }
+
+        @media (max-width: 430px) {
+            .module-grid, .module-row { grid-template-columns: 1fr; }
+            .forecast-day { padding-inline: 3px; }
+            .forecast-day:nth-child(5) { display: none; }
+        }
+
+        @media (max-width: 680px) {
+            html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
+            body { display: block; min-width: 0; padding: 8px; }
+            .dashboard-shell { width: 100%; max-width: 100%; min-width: 0; margin: 0 auto; padding: 10px; backdrop-filter: none; -webkit-backdrop-filter: none; }
+            .topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 9px; padding-inline: 2px; }
+            .brand { min-width: 0; font-size: 0.68rem; white-space: nowrap; }
+            .topbar-right { min-width: 0; gap: 6px; }
+            .topbar-right > span:last-child { display: none; }
+            .location-selector { width: 124px; max-width: 124px; min-width: 0; }
+            .nav { grid-column: 1 / -1; width: 100%; min-width: 0; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
+            .nav::-webkit-scrollbar { display: none; }
+            .nav-link { flex: 0 0 auto; white-space: nowrap; }
+            .metric-row { grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; }
+            .metric-card { min-width: 0; padding-inline: 8px; }
+            .metric-head { gap: 5px; font-size: 0.56rem; letter-spacing: 0.06em; }
+            .metric-value .number { font-size: clamp(1.55rem, 8vw, 2.1rem); }
+            .chart-panel, .forecast-panel, .history-panel, .alerts-panel { min-width: 0; }
+            .chart-header { align-items: flex-start; flex-direction: column; gap: 5px; }
+            .chart-title { max-width: 100%; font-size: 0.76rem; line-height: 1.3; }
+            .chart-header .date-label { white-space: normal; }
+            .chart-wrap { height: 220px; min-width: 0; }
+            .module-header { align-items: flex-start; flex-wrap: wrap; }
+            .forecast-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+            .forecast-day:nth-child(5) { display: none; }
+            .alerts-view-header { align-items: flex-start; flex-direction: column; }
+            .back-dashboard { width: 100%; }
+            .tech-assistant { right: 12px; bottom: 12px; }
+            .tech-chat { right: -2px; width: min(350px, calc(100vw - 24px)); height: min(480px, calc(100dvh - 92px)); }
+        }
+
+        @media (max-width: 360px) {
+            .dashboard-shell { padding: 8px; }
+            .brand { font-size: 0.6rem; }
+            .brand-mark { width: 22px; height: 22px; }
+            .location-selector { width: 108px; max-width: 108px; font-size: 0.6rem; }
+            .metric-row { padding: 7px; gap: 7px; }
+            .metric-head { font-size: 0.5rem; }
+            .metric-value .number { font-size: 1.45rem; }
+            .chart-wrap { height: 205px; }
+            .forecast-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .forecast-day:nth-child(4) { display: none; }
+        }
+
+        .tech-assistant { position: relative; z-index: 2; min-width: 0; font-family: inherit; }
+        .tech-toggle {
+            position: relative;
+            display: grid;
+            width: 58px;
+            height: 58px;
+            place-items: center;
+            padding: 0;
+            color: #dff7f7;
+            cursor: pointer;
+            background: linear-gradient(145deg, #c9e9ec, #5d9dad 58%, #244f68);
+            border: 1px solid rgba(235, 255, 255, 0.7);
+            border-radius: 50%;
+            box-shadow: 0 12px 28px rgba(0, 8, 18, 0.42), inset 0 0 14px rgba(255,255,255,0.52);
+            transition: transform 180ms ease, filter 180ms ease;
+        }
+        .tech-assistant .tech-toggle { position: absolute; top: 10px; right: 42px; width: 30px; height: 30px; opacity: 0.88; }
+        .tech-assistant .tech-toggle .tech-face { transform: scale(0.62); }
+        .tech-toggle:hover, .tech-toggle:focus-visible { filter: brightness(1.1); transform: translateY(-3px) scale(1.04); outline: none; }
+        .tech-toggle::after { content: "Consultar AURA"; position: absolute; right: 68px; top: 50%; padding: 6px 8px; color: #eaf9fa; font-size: 0.66rem; white-space: nowrap; pointer-events: none; opacity: 0; background: rgba(5, 22, 36, 0.92); border: 1px solid rgba(175, 218, 227, 0.2); border-radius: 6px; transform: translateY(-50%) translateX(5px); transition: opacity 160ms ease, transform 160ms ease; }
+        .tech-toggle:hover::after, .tech-toggle:focus-visible::after { opacity: 1; transform: translateY(-50%) translateX(0); }
+        .tech-face { position: relative; width: 35px; height: 28px; background: #1a3f56; border: 2px solid rgba(222, 250, 250, 0.72); border-radius: 12px; box-shadow: inset 0 0 9px rgba(125, 222, 222, 0.28); }
+        .tech-face::before { content: ""; position: absolute; left: 8px; top: 8px; width: 4px; height: 4px; background: #bff5f0; border-radius: 50%; box-shadow: 13px 0 #bff5f0; }
+        .tech-face::after { content: ""; position: absolute; left: 11px; bottom: 5px; width: 10px; height: 5px; border-bottom: 2px solid #bff5f0; border-radius: 0 0 10px 10px; }
+        .tech-chat { position: relative; display: flex; width: 100%; height: 100%; min-height: 466px; flex-direction: column; overflow: hidden; opacity: 1; pointer-events: auto; background: linear-gradient(155deg, rgba(14, 52, 70, 0.98), rgba(5, 25, 42, 0.98)); border: 1px solid rgba(190, 231, 237, 0.24); border-radius: 16px; box-shadow: 0 24px 64px rgba(0, 7, 16, 0.58); transform: none; transition: opacity 180ms ease, transform 180ms ease; }
+        .tech-chat:not(.is-open) { opacity: 0; pointer-events: none; transform: translateY(12px) scale(0.98); }
+        .tech-chat.is-open { opacity: 1; pointer-events: auto; transform: translateY(0) scale(1); }
+        .tech-chat-header { display: flex; align-items: center; justify-content: space-between; padding: 13px 14px; background: rgba(102, 171, 185, 0.12); border-bottom: 1px solid rgba(185, 224, 231, 0.12); }
+        .tech-identity { display: flex; align-items: center; gap: 9px; }
+        .tech-mini-face { display: grid; width: 29px; height: 29px; place-items: center; color: #bff5f0; font-size: 0.62rem; background: #1d4d62; border: 1px solid rgba(210, 246, 246, 0.42); border-radius: 9px; }
+        .tech-name { display: block; color: #f2ffff; font-size: 0.82rem; font-weight: 800; }
+        .tech-status { display: block; margin-top: 2px; color: #9de3c3; font-size: 0.61rem; }
+        .tech-status::before { content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 5px; background: #8ee0bc; border-radius: 50%; box-shadow: 0 0 8px #8ee0bc; }
+        .tech-tools { display: flex; align-items: center; gap: 4px; }
+        .tech-close, .tech-audio { padding: 4px 6px; color: var(--muted-strong); font-size: 1rem; line-height: 1; cursor: pointer; background: transparent; border: 0; }
+        .tech-audio.is-muted { opacity: 0.45; }
+        .tech-messages { position: relative; display: flex; flex: 1; flex-direction: column; gap: 9px; padding: 14px; overflow-y: auto; background: linear-gradient(180deg, rgba(5, 27, 44, 0.84), rgba(5, 24, 40, 0.94)), url("https://images.unsplash.com/photo-1534088568595-a066f410bcda?auto=format&fit=crop&w=1000&q=75") center/cover no-repeat; }
+        .tech-messages::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0.16; background: radial-gradient(ellipse at 18% 20%, rgba(143, 181, 194, 0.7) 0 9%, transparent 29%), radial-gradient(ellipse at 78% 48%, rgba(95, 142, 162, 0.66) 0 10%, transparent 32%), radial-gradient(ellipse at 44% 88%, rgba(119, 159, 173, 0.45) 0 8%, transparent 28%); filter: blur(12px); }
+        .tech-messages > * { position: relative; z-index: 1; }
+        .tech-message { max-width: 86%; padding: 9px 11px; color: #eaf7f8; font-size: 0.74rem; line-height: 1.42; border: 1px solid rgba(189, 225, 231, 0.08); border-radius: 12px 12px 12px 3px; background: rgba(70, 133, 151, 0.3); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); }
+        .tech-message.user { align-self: flex-end; color: #efffff; border-radius: 12px 12px 3px 12px; background: rgba(73, 127, 153, 0.58); }
+        .tech-message strong { color: #ffffff; }
+        .tech-message ul { margin: 0; padding-left: 17px; }
+        .tech-message li + li { margin-top: 7px; }
+        .tech-composer { display: flex; gap: 7px; padding: 10px; border-top: 1px solid rgba(185, 224, 231, 0.12); }
+        .tech-input { min-width: 0; flex: 1; padding: 10px 11px; color: var(--text); font: inherit; font-size: 0.72rem; background: rgba(3, 20, 34, 0.62); border: 1px solid rgba(174, 216, 227, 0.18); border-radius: 9px; outline: none; }
+        .tech-input:focus { border-color: rgba(145, 215, 225, 0.7); }
+        .tech-send { display: grid; width: 36px; place-items: center; color: #f2ffff; font-size: 1rem; cursor: pointer; background: #367c8b; border: 1px solid rgba(191, 237, 239, 0.3); border-radius: 9px; }
+        .tech-mic { display: grid; width: 36px; place-items: center; color: #c5edef; font-size: 0.95rem; cursor: pointer; background: rgba(74, 139, 155, 0.35); border: 1px solid rgba(191, 237, 239, 0.2); border-radius: 9px; }
+        .tech-mic.is-listening { background: rgba(222, 137, 124, 0.6); box-shadow: 0 0 0 4px rgba(222, 137, 124, 0.12); }
+        .tech-waves { display: inline-flex; align-items: center; gap: 2px; height: 12px; margin-left: 5px; vertical-align: middle; }
+        .tech-waves span { width: 2px; height: 6px; background: #8ee0bc; border-radius: 2px; animation: aura-wave 900ms ease-in-out infinite alternate; }
+        .tech-waves span:nth-child(2) { height: 11px; animation-delay: 120ms; }
+        .tech-waves span:nth-child(3) { height: 8px; animation-delay: 240ms; }
+        @keyframes aura-wave { from { transform: scaleY(0.45); opacity: 0.5; } to { transform: scaleY(1); opacity: 1; } }
+        @media (max-width: 900px) {
+            .content-row { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 680px) {
+            .tech-assistant { width: 100%; }
+            .tech-chat { min-height: 440px; }
+            .dashboard-shell { padding-bottom: 78px; }
+            .nav { position: fixed; right: 8px; bottom: 8px; left: 8px; z-index: 15; display: flex; justify-content: space-between; gap: 2px; padding: 5px; background: rgba(7, 28, 44, 0.94); box-shadow: 0 12px 32px rgba(0, 7, 16, 0.46); backdrop-filter: blur(16px); }
+            .nav-link, .nav-link[data-mobile-only] { display: block; min-width: 0; flex: 1 1 0; padding: 8px 4px; overflow: hidden; font-size: 0.57rem; text-overflow: ellipsis; white-space: nowrap; }
+            .nav-link#settingsNav { display: none; }
+        }
+    </style>
+</head>
+<body data-theme="dark">
+    <div class="dashboard-shell">
+        <header class="topbar">
+            <div class="brand">
+                <span class="brand-mark">◌</span>
+                <span>ATMOSTECH AI</span>
+            </div>
+
+            <nav class="nav" aria-label="Navegação principal">
+                <button class="nav-link active" id="dashboardNav" type="button">Painel Geral</button>
+                <button class="nav-link" id="reportsNav" type="button">Relatórios</button>
+                <button class="nav-link" id="alertsNav" type="button">Alertas</button>
+                <button class="nav-link" id="updatesNav" type="button" data-mobile-only>Atualizações</button>
+                <button class="nav-link" id="faqNav" type="button" data-mobile-only>Perguntas Frequentes</button>
+                <button class="nav-link" id="settingsNav" type="button">Configurações</button>
+            </nav>
+
+            <div class="topbar-right">
+                <select class="location-selector" id="locationSelector" aria-label="Selecionar ambiente monitorado">
+                    <option value="Teresina, PI">Teresina, PI</option>
+                    <option value="Laboratório">Laboratório</option>
+                    <option value="Estação externa">Estação externa</option>
+                </select>
+                <span class="mini-badge"></span>
+                <span>ATMOSTECH</span>
+            </div>
+        </header>
+
+        <main class="main-layout">
+            <section class="metric-row" aria-label="Indicadores climáticos principais">
+                <article class="metric-card temp">
+                    <div class="metric-head">
+                        <span>Temperatura</span>
+                        <span class="signal" aria-hidden="true"></span>
+                    </div>
+                    <div class="metric-value">
+                        <span class="number" id="tempAtual">--</span>
+                        <span class="suffix">°C</span>
+                    </div>
+                </article>
+
+                <article class="metric-card humidity">
+                    <div class="metric-head">
+                        <span>Umidade</span>
+                        <span class="signal" aria-hidden="true"></span>
+                    </div>
+                    <div class="metric-value">
+                        <span class="number" id="umidAtual">--</span>
+                        <span class="suffix">%</span>
+                    </div>
+                </article>
+            </section>
+
+            <section class="content-row">
+                <div class="chart-panel">
+                    <div class="chart-header">
+                        <h2 class="chart-title">Monitoramento de Temperatura e Umidade</h2>
+                        <span class="date-label" id="dataAtual">Seg, 21 Jan 2024, 11:14:32, BR</span>
+                    </div>
+                    <div class="chart-wrap">
+                        <canvas id="meuGrafico" aria-label="Gráfico de temperatura e umidade"></canvas>
+                    </div>
+                </div>
+
+                <section class="tech-assistant" aria-label="Assistente virtual AURA">
+                    <div class="tech-chat is-open" id="techChat" aria-hidden="false">
+                        <header class="tech-chat-header">
+                            <div class="tech-identity"><span class="tech-mini-face">✦</span><div><span class="tech-name">AURA</span><span class="tech-status">Online <span class="tech-waves" aria-label="Áudio ativo"><span></span><span></span><span></span></span></span></div></div>
+                            <div class="tech-tools"><button class="tech-audio" id="techAudio" type="button" aria-label="Ativar ou desativar voz">◖</button><button class="tech-close" id="techClose" type="button" aria-label="Fechar assistente">×</button></div>
+                        </header>
+                        <div class="tech-messages" id="techMessages" aria-live="polite"></div>
+                        <form class="tech-composer" id="techForm">
+                            <input class="tech-input" id="techInput" type="text" placeholder="Pergunte sobre clima, alertas ou recomendações..." autocomplete="off" />
+                            <button class="tech-mic" id="techMic" type="button" aria-label="Falar com AURA">●</button>
+                            <button class="tech-send" type="submit" aria-label="Enviar pergunta">➤</button>
+                        </form>
+                    </div>
+                    <button class="tech-toggle" id="techToggle" type="button" aria-label="Consultar AURA" aria-expanded="true"><span class="tech-face" aria-hidden="true"></span></button>
+                </section>
+
+            </section>
+
+            <section class="detail-row" aria-label="Detalhes dos indicadores">
+                <article class="detail-card temp">
+                    <p class="detail-label">Temperatura</p>
+                    <div class="detail-value"><strong id="tempDetalhe">23.3</strong><span>°C</span></div>
+                    <div class="detail-meta">Hoje</div>
+                </article>
+
+                <article class="detail-card humidity">
+                    <p class="detail-label">Umidade</p>
+                    <div class="detail-value"><strong id="umidDetalhe">68</strong><span>%</span></div>
+                    <div class="detail-meta">Hoje</div>
+                </article>
+            </section>
+
+            <section class="climate-modules" aria-label="Informações climáticas complementares">
+                <div class="module-grid">
+                    <article class="climate-card">
+                        <p class="module-label">Sensação térmica</p>
+                        <div class="module-value"><span id="feelsLike">--</span><small>°C</small></div>
+                        <p class="module-note">Calculada pela umidade atual</p>
+                    </article>
+                    <article class="climate-card">
+                        <p class="module-label">Ponto de orvalho</p>
+                        <div class="module-value"><span id="dewPoint">--</span><small>°C</small></div>
+                        <p class="module-note">Conforto do ambiente</p>
+                    </article>
+                    <article class="climate-card">
+                        <p class="module-label">Velocidade do vento</p>
+                        <div class="module-value"><span id="windSpeed">--</span><small>km/h</small></div>
+                        <p class="module-note">Estimativa do monitor</p>
+                    </article>
+                    <article class="climate-card status-card">
+                        <p class="module-label">Status do ambiente</p>
+                        <div class="module-value status-value"><span class="status-dot" id="statusDot"></span><span id="environmentStatus">--</span></div>
+                        <p class="module-note" id="statusDescription">Aguardando leitura</p>
+                    </article>
+                </div>
+
+                <div class="module-row">
+                    <section class="forecast-panel" aria-label="Previsão para os próximos dias">
+                        <div class="module-header"><h2 class="module-title">Previsão dos próximos dias</h2><span class="module-caption" id="forecastLocation">Teresina, PI</span></div>
+                        <div class="forecast-list" id="forecastList"></div>
+                    </section>
+                    <section class="history-panel" aria-label="Histórico e médias diárias">
+                        <div class="module-header"><h2 class="module-title">Histórico comparativo</h2><span class="module-caption" id="dailyAverage">Média: --</span></div>
+                        <div class="history-chart-wrap"><canvas id="historicoGrafico" aria-label="Médias históricas de temperatura e umidade"></canvas></div>
+                    </section>
+                </div>
+
+                <section class="alerts-panel" id="alertsPanel" aria-label="Alertas climáticos">
+                    <div class="module-header"><h2 class="module-title">Alertas do ambiente</h2><span class="module-caption" id="alertCount">0 avisos</span></div>
+                    <div class="alert-list" id="alertList"><span class="empty-alert">Nenhum alerta ativo no momento.</span></div>
+                </section>
+            </section>
+
+        </main>
+
+        <section class="alerts-view" id="alertsView" aria-labelledby="alertsViewTitle">
+            <div class="alerts-view-header">
+                <div><h1 class="alerts-view-title" id="alertsViewTitle">Central de Alertas</h1><p class="alerts-view-subtitle">Acompanhe variações bruscas e condições fora da faixa ideal.</p></div>
+                <button class="back-dashboard" id="backDashboard" type="button">Voltar ao dashboard</button>
+            </div>
+            <div class="alerts-view-card">
+                <div class="module-header"><h2 class="module-title">Avisos do ambiente</h2><span class="module-caption" id="alertsPageCount">0 avisos</span></div>
+                <div class="alert-list" id="alertsPageList"><span class="empty-alert">Nenhum alerta ativo no momento.</span></div>
+            </div>
+        </section>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0"></script>
+    <script type="module" src="app.js"></script>
+</body>
+</html>
