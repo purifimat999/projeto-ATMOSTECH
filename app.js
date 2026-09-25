@@ -6,8 +6,12 @@ if (window.ChartZoom) {
 }
 
 const firebaseConfig = {
-    apiKey: "AIzaSyCJbkfuryRyDq5eHCTQ0XLtGNuuuOyml-4",
-    projectId: "app-clima-3a002",
+    apiKey: "AIzaSyC8RUchuAsxVdsPsk9yEdZ8O8HaG05vKcE",
+    authDomain: "atmostech26.firebaseapp.com",
+    projectId: "atmostech26",
+    storageBucket: "atmostech26.firebasestorage.app",
+    messagingSenderId: "917510370604",
+    appId: "1:917510370604:web:934d5debee73d28863a889"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -34,7 +38,10 @@ const forecastLocationEl = document.getElementById("forecastLocation");
 const dailyAverageEl = document.getElementById("dailyAverage");
 const alertListEl = document.getElementById("alertList");
 const alertCountEl = document.getElementById("alertCount");
-const locationSelectorEl = document.getElementById("locationSelector");
+const deviceCityEl = document.getElementById("deviceCity");
+const boardStatusEl = document.getElementById("boardStatus");
+const boardStatusLabelEl = document.getElementById("boardStatusLabel");
+const boardLocationEl = document.getElementById("boardLocation");
 const alertsNavEl = document.getElementById("alertsNav");
 const dashboardNavEl = document.getElementById("dashboardNav");
 const reportsNavEl = document.getElementById("reportsNav");
@@ -48,6 +55,10 @@ const alertsPageCountEl = document.getElementById("alertsPageCount");
 let historicoGrafico = null;
 let techMessageHistory = [];
 let ultimaLeituraFisica = null;
+let ultimaLeituraTimestamp = 0;
+let cidadeDispositivo = "sua localização";
+let ultimaCidadeFalado = "";
+let ultimaConsultaGeocodificacao = 0;
 const techToggleEl = document.getElementById("techToggle");
 const techChatEl = document.getElementById("techChat");
 const techCloseEl = document.getElementById("techClose");
@@ -76,15 +87,6 @@ if (speechRecognition) {
 } else {
     techMicEl.title = "Comando de voz não disponível neste navegador";
 }
-
-const savedLocation = localStorage.getItem("climateDashboardLocation");
-if (savedLocation) locationSelectorEl.value = savedLocation;
-forecastLocationEl.textContent = locationSelectorEl.value;
-
-locationSelectorEl.addEventListener("change", () => {
-    localStorage.setItem("climateDashboardLocation", locationSelectorEl.value);
-    forecastLocationEl.textContent = locationSelectorEl.value;
-});
 
 function abrirAlertas() {
     mainLayoutEl.style.display = "none";
@@ -155,9 +157,64 @@ function formatoDataAtual(timestamp) {
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
-        timeZoneName: "short",
-        timeZone: "America/Fortaleza"
+        timeZoneName: "short"
     }).replace(".", "");
+}
+
+function atualizarStatusPlaca(timestamp = ultimaLeituraTimestamp) {
+    const online = timestamp > 0 && Date.now() - (timestamp * 1000) <= 180000;
+    boardStatusEl.classList.toggle("is-on", online);
+    boardStatusEl.classList.toggle("is-off", !online);
+    boardStatusEl.setAttribute("aria-pressed", String(online));
+    boardStatusEl.title = online ? "Placa online: última leitura recente" : "Placa offline: sem leitura recente";
+    boardStatusLabelEl.textContent = online ? "ON" : "OFF";
+}
+
+function iniciarLocalizacaoDispositivo() {
+    if (!navigator.geolocation) {
+        boardLocationEl.textContent = "GPS indisponível";
+        return;
+    }
+
+    navigator.geolocation.watchPosition(({ coords }) => {
+        const { latitude, longitude } = coords;
+        boardLocationEl.textContent = `Dispositivo ${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+        boardLocationEl.href = `https://www.google.com/maps?q=${latitude},${longitude}`;
+        boardLocationEl.title = "Abrir a localização atual do dispositivo no mapa";
+        atualizarCidadeDispositivo(latitude, longitude);
+    }, () => {
+        boardLocationEl.textContent = "GPS bloqueado";
+        boardLocationEl.removeAttribute("href");
+        boardLocationEl.title = "Permita o acesso à localização para usar o GPS do dispositivo";
+    }, {
+        enableHighAccuracy: true,
+        maximumAge: 30000,
+        timeout: 15000
+    });
+}
+
+async function atualizarCidadeDispositivo(latitude, longitude) {
+    if (Date.now() - ultimaConsultaGeocodificacao < 60000) return;
+    ultimaConsultaGeocodificacao = Date.now();
+    try {
+        const resposta = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=10&addressdetails=1`);
+        if (!resposta.ok) throw new Error("Falha ao consultar a cidade");
+        const dados = await resposta.json();
+        const endereco = dados.address || {};
+        const cidade = endereco.city || endereco.town || endereco.village || endereco.municipality || endereco.county;
+        if (!cidade) return;
+        cidadeDispositivo = cidade;
+        deviceCityEl.textContent = cidade;
+        forecastLocationEl.textContent = cidade;
+        if (cidade !== ultimaCidadeFalado) {
+            ultimaCidadeFalado = cidade;
+            const avisoLocalizacao = `Localização identificada: ${cidade}.`;
+            if (techChatEl.classList.contains("is-open")) adicionarMensagem(avisoLocalizacao, "tech");
+            falarComoAura(avisoLocalizacao);
+        }
+    } catch (error) {
+        console.warn("Não foi possível identificar a cidade do dispositivo:", error);
+    }
 }
 
 function calcularPontoOrvalho(temperatura, umidade) {
@@ -283,7 +340,7 @@ function anunciarVariacaoFisica(temperatura, umidade) {
     const partes = [];
     if (mudouTemperatura) partes.push(`temperatura ${deltaTemperatura > 0 ? "subiu" : "caiu"} ${Math.abs(deltaTemperatura).toFixed(1)}°C`);
     if (mudouUmidade) partes.push(`umidade ${deltaUmidade > 0 ? "subiu" : "caiu"} ${Math.abs(deltaUmidade).toFixed(0)}%`);
-    const aviso = `🔔 Atualização da placa: ${partes.join(" e ")}. Agora são ${temperatura.toFixed(1)}°C e ${umidade.toFixed(0)}% de umidade.`;
+    const aviso = `🔔 Atualização da placa em ${cidadeDispositivo}: ${partes.join(" e ")}. Agora são ${temperatura.toFixed(1)}°C e ${umidade.toFixed(0)}% de umidade.`;
     if (techChatEl.classList.contains("is-open")) adicionarMensagem(aviso, "tech");
     falarComoAura(aviso);
 }
@@ -466,10 +523,16 @@ umidAtualEl.textContent = valorPadrao.umid.toFixed(0);
 tempDetalheEl.textContent = valorPadrao.temp.toFixed(1);
 umidDetalheEl.textContent = valorPadrao.umid.toFixed(0);
 dataAtualEl.textContent = "Aguardando leitura...";
+atualizarStatusPlaca(0);
+boardLocationEl.textContent = "GPS do dispositivo aguardando";
+iniciarLocalizacaoDispositivo();
 atualizarModulos(valorPadrao.temp, valorPadrao.umid, ["Agora"], [valorPadrao.temp], [valorPadrao.umid]);
+window.setInterval(() => atualizarStatusPlaca(), 15000);
 
 onSnapshot(q, (snapshot) => {
     if (!snapshot || snapshot.empty) {
+        ultimaLeituraTimestamp = 0;
+        atualizarStatusPlaca(0);
         tempAtualEl.textContent = valorPadrao.temp.toFixed(1);
         umidAtualEl.textContent = valorPadrao.umid.toFixed(0);
         tempDetalheEl.textContent = valorPadrao.temp.toFixed(1);
@@ -486,6 +549,8 @@ onSnapshot(q, (snapshot) => {
     const temperaturaAtual = extrairValor(dadosRecentes.temperatura);
     const umidadeAtual = extrairValor(dadosRecentes.umidade);
     const timestampAtual = extrairTimestamp(dadosRecentes.timestamp);
+    ultimaLeituraTimestamp = timestampAtual;
+    atualizarStatusPlaca(timestampAtual);
 
     tempAtualEl.textContent = temperaturaAtual.toFixed(1);
     umidAtualEl.textContent = umidadeAtual.toFixed(0);
@@ -546,7 +611,6 @@ function resetChatHistory() {
 function responderTech(pergunta) {
     if (!techState.ready || techState.temp === null) return "Ops! Estou tendo dificuldades para acessar os dados meteorológicos agora. Por favor, tente novamente em breve.";
     const texto = normalizarPergunta(pergunta);
-    const local = locationSelectorEl.value;
     const risco = techState.temp >= 35 || techState.temp <= 15 || techState.humidity >= 80 || techState.humidity <= 25;
     const topicos = [];
     const querRecomendacao = texto.includes("recomend") || texto.includes("dica") || texto.includes("protec") || texto.includes("saude") || texto.includes("o que fazer") || texto.includes("vestir") || texto.includes("roupa");
@@ -581,7 +645,7 @@ function responderTech(pergunta) {
         topicos.push(`📊 <strong>Menor temperatura no histórico:</strong> ${menor.toFixed(1)}°C, registrada às ${techState.labels[indice] || "--:--"}.`);
     }
     if (querTemperatura && !querMaior && !querMenor) {
-        topicos.push(`🌡️ <strong>Temperatura atual em ${local}:</strong> ${techState.temp.toFixed(1)}°C.`);
+        topicos.push(`🌡️ <strong>Temperatura atual em ${cidadeDispositivo}:</strong> ${techState.temp.toFixed(1)}°C.`);
     }
     if (querUmidade) {
         const status = techState.humidity > 70 ? "alta" : techState.humidity < 35 ? "baixa" : "normal";
@@ -636,7 +700,7 @@ function abrirTech() {
         return;
     }
     if (aberto && !techMessagesEl.children.length) {
-        const boasVindas = "Olá! Sou a AURA. Posso te ajudar com dados de temperatura, umidade, histórico, alertas de risco ou recomendações climáticas. Como posso ajudar agora?";
+        const boasVindas = `Olá! Sou a AURA. Estou monitorando ${cidadeDispositivo}. Posso te ajudar com dados de temperatura, umidade, histórico, alertas de risco ou recomendações climáticas. Como posso ajudar agora?`;
         adicionarMensagem(boasVindas, "tech");
         falarComoAura(boasVindas);
     }

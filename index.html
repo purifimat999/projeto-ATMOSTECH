@@ -531,20 +531,15 @@
         .nav-link:not(.active) { cursor: pointer; }
         .nav-link[data-mobile-only] { display: none; }
 
-        .location-selector {
-            appearance: none;
-            max-width: 142px;
-            padding: 7px 25px 7px 10px;
+        .device-city {
+            display: inline-block;
+            max-width: 130px;
+            overflow: hidden;
             color: var(--muted-strong);
-            font: inherit;
             font-size: 0.67rem;
-            background: rgba(6, 26, 42, 0.62) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='m2 3 3 3 3-3' fill='none' stroke='%23b8d5dd' stroke-width='1.2'/%3E%3C/svg%3E") right 9px center/10px no-repeat;
-            border: 1px solid rgba(180, 220, 230, 0.18);
-            border-radius: 8px;
-            outline: none;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
-
-        .location-selector:focus { border-color: rgba(147, 213, 224, 0.65); }
 
         .climate-modules { display: grid; gap: 10px; margin-top: 10px; }
         .module-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
@@ -604,6 +599,54 @@
             background: radial-gradient(circle at 50% 35%, #e4edf0 0 22%, #829aa7 24% 43%, #415868 45% 100%);
             box-shadow: 0 0 0 3px rgba(199, 225, 232, 0.1);
         }
+
+        .board-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            color: var(--muted-strong);
+            font: inherit;
+            font-size: 0.62rem;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            cursor: default;
+            background: rgba(105, 126, 136, 0.16);
+            border: 1px solid rgba(196, 219, 224, 0.18);
+            border-radius: 8px;
+        }
+
+        .board-status::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #f19b8d;
+            box-shadow: 0 0 8px #f19b8d;
+        }
+
+        .board-status.is-on {
+            color: #9de3c3;
+            background: rgba(83, 174, 137, 0.14);
+            border-color: rgba(142, 224, 188, 0.28);
+        }
+
+        .board-status.is-on::before {
+            background: #8ee0bc;
+            box-shadow: 0 0 8px #8ee0bc;
+        }
+
+        .board-location {
+            max-width: 190px;
+            overflow: hidden;
+            color: var(--muted);
+            font-size: 0.58rem;
+            text-overflow: ellipsis;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        .board-location:hover { color: var(--text); text-decoration: underline; }
 
         .main-layout { padding-top: 14px; }
 
@@ -688,7 +731,6 @@
             .nav { order: 3; justify-content: flex-start; padding: 3px; }
             .nav-link { padding-inline: 0.65rem; }
             .topbar-right { flex-wrap: wrap; justify-content: flex-end; }
-            .location-selector { order: 2; max-width: 132px; }
             .module-grid, .module-row { grid-template-columns: 1fr 1fr; }
             .module-row { gap: 10px; }
             .forecast-panel, .history-panel, .alerts-panel { grid-column: 1 / -1; }
@@ -710,7 +752,6 @@
             .brand { min-width: 0; font-size: 0.68rem; white-space: nowrap; }
             .topbar-right { min-width: 0; gap: 6px; }
             .topbar-right > span:last-child { display: none; }
-            .location-selector { width: 124px; max-width: 124px; min-width: 0; }
             .nav { grid-column: 1 / -1; width: 100%; min-width: 0; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; }
             .nav::-webkit-scrollbar { display: none; }
             .nav-link { flex: 0 0 auto; white-space: nowrap; }
@@ -736,7 +777,6 @@
             .dashboard-shell { padding: 8px; }
             .brand { font-size: 0.6rem; }
             .brand-mark { width: 22px; height: 22px; }
-            .location-selector { width: 108px; max-width: 108px; font-size: 0.6rem; }
             .metric-row { padding: 7px; gap: 7px; }
             .metric-head { font-size: 0.5rem; }
             .metric-value .number { font-size: 1.45rem; }
@@ -831,11 +871,9 @@
             </nav>
 
             <div class="topbar-right">
-                <select class="location-selector" id="locationSelector" aria-label="Selecionar ambiente monitorado">
-                    <option value="Teresina, PI">Teresina, PI</option>
-                    <option value="Laboratório">Laboratório</option>
-                    <option value="Estação externa">Estação externa</option>
-                </select>
+                <span class="device-city" id="deviceCity">Localizando...</span>
+                <button class="board-status is-off" id="boardStatus" type="button" aria-label="Status da placa" aria-pressed="false"><span>Placa <strong id="boardStatusLabel">OFF</strong></span></button>
+                <a class="board-location" id="boardLocation" href="#" target="_blank" rel="noopener">GPS do dispositivo aguardando</a>
                 <span class="mini-badge"></span>
                 <span>ATMOSTECH</span>
             </div>
@@ -935,7 +973,7 @@
 
                 <div class="module-row">
                     <section class="forecast-panel" aria-label="Previsão para os próximos dias">
-                        <div class="module-header"><h2 class="module-title">Previsão dos próximos dias</h2><span class="module-caption" id="forecastLocation">Teresina, PI</span></div>
+                        <div class="module-header"><h2 class="module-title">Previsão dos próximos dias</h2><span class="module-caption" id="forecastLocation">Localizando...</span></div>
                         <div class="forecast-list" id="forecastList"></div>
                     </section>
                     <section class="history-panel" aria-label="Histórico e médias diárias">
